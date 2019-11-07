@@ -1,0 +1,210 @@
+create table "Login" 
+(
+   UserID               varchar(30)                    not null primary key ,
+   Password             varchar(60)                    not null,
+   Role                 varchar(30)                    not null -- unique  CHECK (Role like 'Doctor' or Role like 'Receptionist' or Role like 'Admin'),
+  
+);
+
+create table Dentist
+(
+   Dentist_id             varchar(30)                     not null  primary key ,
+  -- CombinedId AS 'Dentist_' +Dentist_id  ,
+   firstname               varchar(30)                    not null,
+   lastname                varchar(30)                    not null,
+   email                   varchar(30)                    not null,
+   phone                   varchar(30)                    not null CHECK (phone like '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'),
+   Speciality              varchar(30)                    not null,
+   address                 varchar(30)                    not null,
+ 
+);
+
+create table admin 
+( 
+	UserID              varchar(30)                             not null primary key ,
+   admin_name           varchar(30)                            not null
+  
+  
+);
+
+insert into admin values('maria','maria');
+insert into "Login" values('maria','maria','Admin');
+
+---===table for available days from to....
+create table Available 
+(
+  Dentist_id			varchar(30) 				   not null ,
+   Day_name             varchar(30)                    not null  ,
+   "from"               time                           not  null,
+   "to"                 time                           not null,
+   constraint PK_DENTIST_DayName primary key (Dentist_id,Day_name,"from","to"),
+   constraint FK_DENTIST_ID_OF_AvailableDay foreign key (Dentist_id) references Dentist (Dentist_id)---esm lfk not right! must eddit it later
+);
+----table for which daya dentist is availabe
+create table Availableday
+(  Dentist_id			varchar(30) 				   not null ,
+    Day_name             varchar(30)                    not null  ,
+    Available            bit                           not null    ,
+	constraint PK_DENTIST_Available primary key (Dentist_id,Day_name,Available),
+   constraint FK_DENTIST_ID_OF_Dentist foreign key (Dentist_id) references Dentist (Dentist_id)
+
+);
+/*
+drop table Availableday
+drop table Available
+select * from Availableday
+select * from Available
+*/
+
+create table Receptionist 
+(
+   Receptionist_id     varchar(30)                           not null primary key  ,
+  -- CombinedId AS 'Receptionist_' + Receptionist_id   ,
+  
+   firstName            varchar(30)                     not null,
+   lastName		        varchar(30)                     not null,
+   email                varchar(30)                     not null,
+   phone                varchar(30)                     not null CHECK (phone like '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'),
+    
+);
+
+create table Patient
+(
+   Patient_id                varchar(30)                     not null  primary key    ,
+   --CombinedId                 AS                            'Patient_' + Patient_id  ,
+   firstName                 varchar(30)                     not null,
+   LastName                  varchar(30)                     not null,
+   email                     varchar(30)                     not null,
+   phone                     varchar(30)                     not null  CHECK (phone like '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'),
+   address                   varchar(30)                     not null
+  
+   
+);
+
+--    drop table Appointment
+create table Appointment 
+(
+   Appointment_id       int                            not null  primary key   IDENTITY(1,1)   ,
+   Patient_id           varchar(30)                    not null,
+   Dentist_id           varchar(30)                    not null,
+   StartTime            time                           not null,
+   EndTime              time                           not null,
+   Canceled             bit                            not null default(0),
+   "Date"			    Date						   not null,
+   period               varchar(30)                    not null,
+  constraint FK_APPOINTMET_HAS_Patient foreign key (Patient_id) references Patient (Patient_id),
+ 
+  constraint FK_APPOINTMENTs_HAS_Dentist foreign key (Dentist_id) references Dentist (Dentist_id)
+
+)
+
+
+/*
+
+
+print TimeADD(minutes, 30, '8:00AM', 7)
+print LTRIM(RIGHT(CONVERT(VARCHAR(20),DATEADD(mi, 30, '8:00AM', 7), 100), 7)) --minutes
+*/
+ 	 	
+
+create table Notified 
+(
+   Notification_id                  int                        not null  identity(1,1),
+  "Date"                            datetime                   not null,
+   Receptionist_id                  varchar(30)                null,
+   Message							text                       not null,
+   constraint PK_NOTIFIED primary key (Notification_id),
+   constraint FK_NOTIFIED_DO_NOTIFY_RECEPTIONIST foreign key (Receptionist_id) references Receptionist (Receptionist_id)
+);
+
+create table PatientNotified 
+(
+   Notification_id                  int                        not null,
+   Patient_id                       varchar(30)                  not null,
+   constraint PK_Patient_NOTIFIED primary key (Notification_id, Patient_id),
+   constraint FK_PATIENTNO_PATIENT_PATIENT foreign key (Patient_id)  references Patient (Patient_id),
+   constraint FK_PATIENT_ID_NOTIFIFICATION foreign key (Notification_id)references Notified (Notification_id)
+);
+
+create table DentistNotified 
+(
+   Notification_id                  int                        not null,
+   Dentist_id                       varchar(30)                not null,
+   constraint PK_DENTISTNOTIFIED primary key (Notification_id,Dentist_id),
+   constraint FK_DENTIST_ID_OF_NOTIFICATION foreign key (Notification_id) references Notified (Notification_id),
+   constraint FK_DENTISTNOTI_dentist_dentist foreign key (Dentist_id) references Dentist (Dentist_id)
+);
+
+--******************************************************************************************************************
+alter table Patient   add constraint chk_Patient_email check (email like '%_@__%.__%')
+alter table Dentist   add constraint chk_dentist_email check (email like '%_@__%.__%')
+alter table Dentist   add constraint chk_Speciality  UNIQUE(Speciality )
+
+alter table Appointment add CONSTRAINT CHK_EndTime_After_StartTime CHECK (EndTime > StartTime)
+alter table Available  add CONSTRAINT CHK_From_To CHECK ("from" < "to")
+alter table Available  add constraint CHK_DayName check( Day_name like'Monday' or  Day_name like'Tuesday' or 
+														 Day_name like 'Wednesday' or Day_name like'Thursday' or  
+														 Day_name like'Friday' or  Day_name like'Saturday' or  Day_name like'Sunday')
+
+alter table Appointment add constraint CHK_ValidDate check ("Date" >= CAST(GETDATE() AS DATE)  )
+
+--******************************************************************************************************************
+
+
+/*
+---case sensetive validation
+CREATE PROCEDURE LoginValidation
+    @Username varchar(30),
+    @Password varchar(30)
+AS
+BEGIN
+     select * from "Login" where UserID = @Username AND Password = @Password COLLATE SQL_Latin1_General_CP1_CS_AS
+END
+*/
+
+create function count(@date date , @did varchar(30),@pid varchar(30))
+returns  int
+as begin
+declare @count  int
+select @count=count(Appointment.Appointment_id) from Appointment where "Date"=@date and Dentist_id=@did and Patient_id=@pid
+return @count
+end
+
+
+--print(dbo.number_of_appointments('12-28-2017','7'))
+
+------==============number of appointments for a specific date ==========================-----
+--done
+create function number_of_appointments(@wanted_date Date , @dentist_id varchar(30))
+returns int
+As
+begin
+declare @count int 
+select @count=count(Appointment.Appointment_id)from Appointment  where Appointment.Dentist_id=@dentist_id 
+and Appointment.Date=@wanted_date 
+return @count
+end
+
+-
+alter function GetAllDays(@id varchar(30))
+ returns table 
+ as
+ return (select Day_name, LTRIM(RIGHT(CONVERT(VARCHAR(20),"from", 100), 7)) as "from" ,
+   LTRIM(RIGHT(CONVERT(VARCHAR(20),"to", 100), 7))  as "to" , Avaliable  from availableHours where availableHours.Dentist_id=@id  )
+
+   --=== stored procedure when dentist be8yerl available time le 2elo kel ldays tb3 hal dentist be lavaialble table must be set la lshi le8yro
+
+-- print DATENAME(weekday, getdate())  
+
+
+nope--||||||||||||||||||||||||||||||||||||||||||--list all dentist and show if they are availablle or not on this date|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+create function list_Dentists(@date date)
+returns table
+ as return(
+ select Dentist.Dentist_id, Dentist.firstname,Dentist.lastname , Dentist.Speciality    , 'Available'=
+ case 
+ when Available.Avaliable=0 then 'UnAvailable'
+ else 'Available'
+ end 
+ from Dentist , Available where Available.Day_name=DATENAME(weekday , @date) )
+ go

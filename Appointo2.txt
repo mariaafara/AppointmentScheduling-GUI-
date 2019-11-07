@@ -1,0 +1,228 @@
+use AppointmentScheduling 
+go 
+
+--============================================================================================
+create trigger already_inserted_Patient
+on Patient
+after insert
+as 
+begin
+declare @count int
+set @count=(select Patient_id  from Patient where Patient_id=(select Patient_id from inserted))
+	if(@count=2)
+	begin 
+		raiserror( 'Patient already exist' ,15,120) ; 
+		delete from Patient where Patient.Patient_id=(select Patient_id from inserted)
+	end
+end
+--=======================================================================================
+---======patient can schedule in the same date for different dentists but cant schedule for the same dentist more than one time !=====-------
+--done
+
+--=======================================================================================================================================
+--=============================list of all start and end of appointments  for specific dentists on specific day
+
+--=======================================================================================================================================
+
+--=======================================================================================================================================
+--done
+create function List_time (@did varchar(30), @date date)
+returns table
+AS 
+return(
+ select StartTime , EndTime from  Appointment 
+    where Dentist_id=@did and Appointment.Date=@date and canceled =0
+	)
+
+go
+
+
+
+create function timeBetween(@start time, @end time ,@did varchar(30),@date varchar(30)) 
+returns bit
+as begin
+declare @c cursor ,  @e time ,@s time
+set @c=cursor for select  StartTime , EndTime from  Appointment 
+    where Dentist_id=@did and Appointment.Date=@date and canceled =0--from List_time( @did , @date)
+open @c
+fetch next from @c into @s, @e
+while @@FETCH_STATUS=0
+begin 
+if( @start > @s and @start < @e  ) 
+ return 0
+ if( @end > @s and @end < @e  ) --yntehe mw3ed be2lb mw3ed tene mhjuz 
+ return 0
+fetch next from @c into @s, @e
+end 
+close @c
+return 1
+   end
+--------
+alter trigger schedule_one_time
+ on Appointment
+ instead of insert 
+ as
+ begin 
+  declare @did varchar(30)
+  declare @pid varchar(30),@s time ,@e time ,@p varchar(30)
+  declare @date date 
+  select @did=Dentist_id from inserted
+  select @pid=Patient_id from inserted
+  select @date="Date" from inserted
+  select @s=StartTime from inserted
+ set @e= (select EndTime from inserted)
+ select @p=Period from inserted
+   if(not exists(select Appointment.Patient_id  from Appointment where "Date"=@date and 
+   Dentist_id=@did and Patient_id=@pid) and dbo.timeBetween(@s, @e ,@did ,@date)=1 )
+
+	  begin
+	  insert into Appointment values(@pid,@did,@s,@e,0,@date,@p)
+	  end
+	 else 
+	  raiserror('paient cannot have more than 1 app ...or unvalide times for an appointment ',15,0)--mw3ed tene b3do ma
+end
+--
+----================end time cant be included of the range of anotheer appointment
+select * from Availableday where Dentist_id='88888'
+
+-------------------------------appointments cant be booked at the same time------
+--done
+create  trigger appointmentcheckStartTime
+on Appointment 
+after insert
+as
+begin 
+declare @did varchar(30)
+declare @date date ,@start time 
+set @date =(select  Date from inserted)
+set @did=(select Dentist_id from inserted)
+set @start= (select StartTime from inserted)
+
+declare @count int
+
+select @count=count(Appointment.Appointment_id) from Appointment where "Date"=@date and Dentist_id=@did and StartTime=@start
+if (@count=2)
+begin 
+		raiserror( 'Sarttime already booked on this time of this date ' ,15,120) ; 
+		delete from Appointment where Appointment.Appointment_id=(select Appointment_id from inserted)
+	end
+end
+
+--****************************************************************!!!!!!
+
+
+create function EndtimesofAday( @did varchar(30), @date date)
+returns table 
+AS 
+return(
+select  Appointment.EndTime ,Appointment.Appointment_id from  Appointment 
+    where Appointment.Dentist_id=@did and Appointment.Date=@date
+	)
+	
+	--select * from Appointment
+--=============================================
+ --=======================================================================================
+ --====================executed!==================
+create view availableHours as
+ select * from Available 
+
+--=========================================
+
+ --=========================================
+create function GetAllDays(@did varchar(30))
+ returns table 
+ as  
+ return (select Day_name, LTRIM(RIGHT(CONVERT(VARCHAR(20),"from", 100), 7)) as "from" ,
+   LTRIM(RIGHT(CONVERT(VARCHAR(20),"to", 100), 7))  as "to"   from availableHours where availableHours.Dentist_id=@did  )
+
+  -- select * from GetAllDays('200')
+---===============================================
+---====select all appointments of a dentist according to a date
+create function appointmentsofdentistDATE(@id varchar(30),@date date)
+returns table
+return(
+select Appointment.Appointment_id, Appointment.Patient_id, Patient.firstName ,Patient.LastName, LTRIM(RIGHT(CONVERT(VARCHAR(20),StartTime, 100), 7)) as start,LTRIM(RIGHT(CONVERT(VARCHAR(20),EndTime, 100), 7)) as "end" from Appointment,Patient where 
+Dentist_id=@id and "Date"=@date and Appointment.Patient_id=Patient.Patient_id and Appointment.Canceled=0)
+
+--select * from Appointment
+
+--============select all patient who took appointment for a dentist
+create function DentistPatients (@did varchar(30))
+returns table
+AS 
+return(
+  select   distinct(Patient.Patient_id ), Patient.firstName  , Patient.lastName , Patient.phone , Patient.email , Patient.address  from  Appointment , Patient
+    where Appointment.Dentist_id=@did  and Appointment.Patient_id=Patient.Patient_id 
+	)
+	
+--select * from DentistPatients ('200')
+
+--============view all appointments of a patient old and new 
+create function GetPatientsAppointments(@pid varchar(30))
+ returns table
+ as 
+ return (select   Appointment.Dentist_id,Appointment.Date, LTRIM(RIGHT(CONVERT(VARCHAR(20),StartTime, 100), 7)) as  Start,
+  LTRIM(RIGHT(CONVERT(VARCHAR(20),EndTime, 100), 7)) as "End" from Appointment where  
+  Appointment.Patient_id=@pid )
+
+
+ -- select * from GetPatientsAppointments('174')
+
+  -------------=returns the appointments of todays 
+    
+create function getTodyaApp(@did varchar(30))
+  returns table as
+  return(
+select Patient.Patient_id, Patient.firstName,Patient.LastName,LTRIM(RIGHT(CONVERT(VARCHAR(20), Appointment.StartTime, 100), 7)) as  Start,
+  LTRIM(RIGHT(CONVERT(VARCHAR(20),Appointment.EndTime, 100), 7)) as "End"
+ from Appointment ,Patient where
+ Date=CONVERT(date, getdate()) and Appointment.Dentist_id=@did
+ and Appointment.Patient_id=Patient.Patient_id and Appointment.Canceled=0
+  
+  )
+--=====-------------------------------appointments on a specific date---------------------------------------------------------------------------------------------------========
+create function getDateApp(@did varchar(30),@date date)
+  returns table as
+  return(
+select Patient.Patient_id, Patient.firstName,Patient.LastName,LTRIM(RIGHT(CONVERT(VARCHAR(20), Appointment.StartTime, 100), 7)) as  Start,
+  LTRIM(RIGHT(CONVERT(VARCHAR(20),Appointment.EndTime, 100), 7)) as "End"
+ from Appointment ,Patient where
+ Date=@date and Appointment.Dentist_id=@did
+ and Appointment.Patient_id=Patient.Patient_id  and Appointment.Canceled=0
+  
+  )
+  --=====-------------------------------appointments canceled---------------------------------------------------------------------------------------------------========
+create function getCanceledApp(@did varchar(30),@date date)
+  returns table as
+  return(
+select Appointment.Patient_id, Patient.firstName,Patient.LastName,LTRIM(RIGHT(CONVERT(VARCHAR(20), Appointment.StartTime, 100), 7)) as  Start,
+  LTRIM(RIGHT(CONVERT(VARCHAR(20),Appointment.EndTime, 100), 7)) as "End"
+ from Appointment ,Patient where
+ Date=@date and Appointment.Dentist_id=@did and Appointment.Canceled=1
+ and Appointment.Patient_id=Patient.Patient_id  
+  
+  )
+
+  select * from getCanceledApp('11111','15-1-2018')
+ --=====----------------------------------------------------------------------------------------------------------------------------------========
+ --procedure when a dentist changes his availabiity day to off aall ppointments on this day of the week is canceled further 
+ --hen the reverse all appointments that were cnceled wil be uncanceled....
+-- print DATENAME(dw,GETDATE());
+--create view appointmentsdayofweek
+
+
+create procedure alterappointment( @did varchar(30) , @dayname varchar(30), @on bit)
+ as begin 
+ if(@on=0)--tafytaa lal toggle
+ update Appointment set Appointment.Canceled=1 where DATENAME(dw,Appointment.Date)=@dayname  and Appointment.Dentist_id=@did
+ else--dawyta
+ update Appointment set Appointment.Canceled=0 where DATENAME(dw,Appointment.Date)=@dayname and Appointment.Dentist_id=@did
+ end 
+ go
+
+create function GetHours(   @day varchar(30) ,@id varchar(30))
+ returns table
+ as 
+ return (select  LTRIM(RIGHT(CONVERT(VARCHAR(20),"from", 100), 7)) as "from",
+  LTRIM(RIGHT(CONVERT(VARCHAR(20),"to", 100), 7)) as 
+ "to" from Available where Available.Day_name =@day and Available.Dentist_id=@id)
